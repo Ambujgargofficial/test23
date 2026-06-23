@@ -236,27 +236,28 @@
                     </div>
                     <div>
                         <label class="block text-[10px] font-bold text-indigo-600 mb-1 uppercase">Premium <span class="text-rose-500">*</span></label>
-                        <input type="number" id="i_premium" placeholder="0" class="form-input border-indigo-200 bg-indigo-50/20" oninput="hidePremiumError()">
+                        <input type="number" id="i_premium" placeholder="0" class="form-input border-indigo-200 bg-indigo-50/20" oninput="validatePremium()">
                     </div>
 
                     <!-- Payment Section -->
                     <div class="xl:col-span-5 border-t border-slate-100 mt-2 pt-4"></div>
                     
-                    <div>
+                    <!-- WRAPPERS ADDED FOR TOGGLING -->
+                    <div id="wrapper_cash" class="hidden">
                         <label class="block text-[10px] font-bold text-emerald-600 mb-1 uppercase">Cash</label>
-                        <input type="number" id="i_cash" placeholder="0" class="form-input border-emerald-100 bg-emerald-50/20" oninput="hidePremiumError()">
+                        <input type="number" id="i_cash" placeholder="0" class="form-input border-emerald-100 bg-emerald-50/20" oninput="validatePremium()">
                     </div>
-                    <div>
+                    <div id="wrapper_paytm" class="hidden">
                         <label class="block text-[10px] font-bold text-blue-600 mb-1 uppercase">Paytm</label>
-                        <input type="number" id="i_paytm" placeholder="0" class="form-input border-blue-100 bg-blue-50/20" oninput="hidePremiumError()">
+                        <input type="number" id="i_paytm" placeholder="0" class="form-input border-blue-100 bg-blue-50/20" oninput="validatePremium()">
                     </div>
-                    <div>
+                    <div id="wrapper_udhar" class="hidden">
                         <label class="block text-[10px] font-bold text-rose-600 mb-1 uppercase">Udhar</label>
-                        <input type="number" id="i_udhar" placeholder="0" class="form-input border-rose-100 bg-rose-50/20" oninput="hidePremiumError()">
+                        <input type="number" id="i_udhar" placeholder="0" class="form-input border-rose-100 bg-rose-50/20" oninput="validatePremium()">
                     </div>
                     
                     <!-- Compact Payout & Error Message combination -->
-                    <div class="xl:col-span-2 flex items-end gap-3">
+                    <div class="xl:col-span-2 flex items-end gap-3" id="wrapper_payout">
                         <div class="flex-1">
                             <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Payout</label>
                             <input type="number" id="i_payout" placeholder="0" class="form-input">
@@ -433,7 +434,7 @@
                                 <th class="p-3 border-b border-slate-200">Customer Name</th>
                                 <th class="p-3 border-b border-slate-200">Reg Number</th>
                                 <th class="p-3 border-b border-slate-200">Premium</th>
-                                <th class="p-3 border-b border-slate-200">Tenure</th>
+                                <th class="p-3 border-b border-slate-200">Start Date</th>
                             </tr>
                         </thead>
                         <tbody id="drillDownBody" class="divide-y divide-slate-100"></tbody>
@@ -602,15 +603,65 @@
             inputs.endDate.value = `${yyyy}-${mm}-${dd}`;
         }
 
+        function hidePremiumError() {
+            document.getElementById('premiumWarningBox').classList.replace('flex', 'hidden');
+        }
+
+        function validatePremium() {
+            // New logic: Do not validate if "New" is selected
+            if (inputs.newOld.value === 'New') {
+                hidePremiumError();
+                return true;
+            }
+            
+            const premium = parseFloat(inputs.premium.value) || 0;
+            const cash = parseFloat(inputs.cash.value) || 0;
+            const paytm = parseFloat(inputs.paytm.value) || 0;
+            const udhar = parseFloat(inputs.udhar.value) || 0;
+            const paymentSum = cash + paytm + udhar;
+            const hasValues = inputs.premium.value || inputs.cash.value || inputs.paytm.value || inputs.udhar.value;
+
+            if (hasValues && premium !== paymentSum) {
+                document.getElementById('errPremiumVal').textContent = premium;
+                document.getElementById('errPaymentSum').textContent = paymentSum;
+                document.getElementById('premiumWarningBox').classList.replace('hidden', 'flex');
+                return false; 
+            }
+            hidePremiumError();
+            return true;
+        }
+
         function handleNewOldToggle() {
+            const wCash = document.getElementById('wrapper_cash');
+            const wPaytm = document.getElementById('wrapper_paytm');
+            const wUdhar = document.getElementById('wrapper_udhar');
+
             if (inputs.newOld.value === 'New') {
                 inputs.regNumber.value = 'New'; inputs.regNumber.readOnly = true;
                 if(inputs.invNumber.value === 'Old') inputs.invNumber.value = '';
+                
+                // Hide payment fields
+                wCash.classList.add('hidden');
+                wPaytm.classList.add('hidden');
+                wUdhar.classList.add('hidden');
+                
+                // Reset them so no stray data is accidentally saved
+                inputs.cash.value = '0';
+                inputs.paytm.value = '0';
+                inputs.udhar.value = '0';
+                
+                hidePremiumError();
             } else {
                 inputs.regNumber.value = ''; inputs.regNumber.readOnly = false;
                 inputs.invNumber.value = 'Old';
+                
+                // Show payment fields
+                wCash.classList.remove('hidden');
+                wPaytm.classList.remove('hidden');
+                wUdhar.classList.remove('hidden');
             }
             updateEndDate();
+            validatePremium(); // re-check validation state
         }
 
         inputs.newOld.addEventListener('change', handleNewOldToggle);
@@ -654,11 +705,6 @@
                     currentSN = 1; 
                     document.getElementById('nextSnDisplay').textContent = currentSN;
                 });
-        }
-
-        // Hides the compact error message when user starts correcting the payment values
-        function hidePremiumError() {
-            document.getElementById('premiumWarningBox').classList.replace('flex', 'hidden');
         }
 
         function resetChequeSetupForm() {
@@ -842,22 +888,11 @@
                 }
             }
             
-            // VALIDATION ONLY HAPPENS ON SAVE
-            const premium = parseFloat(inputs.premium.value) || 0;
-            const cash = parseFloat(inputs.cash.value) || 0;
-            const paytm = parseFloat(inputs.paytm.value) || 0;
-            const udhar = parseFloat(inputs.udhar.value) || 0;
-            const paymentSum = cash + paytm + udhar;
-            const hasValues = inputs.premium.value || inputs.cash.value || inputs.paytm.value || inputs.udhar.value;
-
-            // If there's a mismatch, show the compact error box and stop saving!
-            if (hasValues && premium !== paymentSum) {
-                document.getElementById('errPremiumVal').textContent = premium;
-                document.getElementById('errPaymentSum').textContent = paymentSum;
-                document.getElementById('premiumWarningBox').classList.replace('hidden', 'flex');
+            // VALIDATE PREMIUM (only if Renewal)
+            if (!validatePremium()) {
                 showToast("Premium mismatch! Please fix.", "error");
                 inputs.premium.focus();
-                return; 
+                return;
             }
 
             const btn = document.getElementById('savePolicyBtn');

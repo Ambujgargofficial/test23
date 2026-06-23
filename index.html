@@ -160,6 +160,7 @@
                     <div>
                         <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Network Name <span class="text-rose-500">*</span></label>
                         <select id="i_networkName" class="form-input">
+                            <option value="" disabled selected>-- Select Network --</option>
                             <option value="MASHA SHOWROOM">MASHA SHOWROOM</option>
                             <option value="DEBAI-AGARWAL HONDA">DEBAI-AGARWAL HONDA</option>
                             <option value="JAHANGIRABAD-BHAGIRATHI HONDA">JAHANGIRABAD-BHAGIRATHI HONDA</option>
@@ -689,11 +690,23 @@
         });
 
         function initializeApp() {
+            // Force clear browser cached inputs on refresh
+            Object.keys(inputs).forEach(key => {
+                if(['date', 'insCompany', 'newOld', 'tenure', 'endDate'].includes(key)) return;
+                if(inputs[key].type === 'text' || inputs[key].type === 'number') inputs[key].value = '';
+            });
+            
             const today = getTodayString();
             document.getElementById('currentDateDisplay').textContent = formatDateToDisplay(today);
             inputs.date.value = today;
             master.targetDate.value = today;
             master.chequeDate.value = today;
+            
+            inputs.networkName.value = "";
+            inputs.insCompany.value = "ICICI LOMBARD";
+            inputs.newOld.value = "New";
+            inputs.tenure.value = "1 Year";
+            
             handleNewOldToggle(); 
             updateEndDate();
             
@@ -945,6 +958,7 @@
                 // Reset Policy Form
                 ['invNumber', 'modelName', 'customerName', 'mobile', 'policyNumber', 'odValue', 'premium', 'frames', 'cash', 'paytm', 'udhar', 'remark', 'payout'].forEach(id => inputs[id].value = '');
                 inputs.tenure.value = '1 Year';
+                inputs.networkName.value = '';
                 handleNewOldToggle(); 
                 hidePremiumError(); // Reset the error box
                 window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1035,7 +1049,7 @@
                     tbody.innerHTML = (!result.data || result.data.length === 0) ? `<tr><td colspan="5" class="p-8 text-center">No policies found.</td></tr>` : '';
                     result.data.forEach(rec => {
                         const tr = document.createElement('tr'); tr.className = "bg-white hover:bg-slate-50";
-                        tr.innerHTML = `<td class="p-3 border-b text-center font-mono">${rec.sn}</td><td class="p-3 border-b font-semibold">${rec.customerName}</td><td class="p-3 border-b font-mono text-xs">${rec.regNumber}</td><td class="p-3 border-b font-bold">₹${rec.premium}</td><td class="p-3 border-b">${rec.startDate}</td>`;
+                        tr.innerHTML = `<td class="p-3 border-b text-center font-mono">${rec.sn}</td><td class="p-3 border-b font-semibold">${rec.customerName}</td><td class="p-3 border-b font-mono text-xs">${rec.regNumber}</td><td class="p-3 border-b font-bold">₹${rec.premium}</td><td class="p-3 border-b">${formatDateToDisplay(rec.startDate)}</td>`;
                         tbody.appendChild(tr);
                     });
                 });

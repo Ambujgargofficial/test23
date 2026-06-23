@@ -236,7 +236,7 @@
                     </div>
                     <div>
                         <label class="block text-[10px] font-bold text-indigo-600 mb-1 uppercase">Premium <span class="text-rose-500">*</span></label>
-                        <input type="number" id="i_premium" placeholder="0" class="form-input border-indigo-200 bg-indigo-50/20" oninput="validatePremium()">
+                        <input type="number" id="i_premium" placeholder="0" class="form-input border-indigo-200 bg-indigo-50/20" oninput="hidePremiumError()">
                     </div>
 
                     <!-- Payment Section -->
@@ -245,15 +245,15 @@
                     <!-- WRAPPERS ADDED FOR TOGGLING -->
                     <div id="wrapper_cash" class="hidden">
                         <label class="block text-[10px] font-bold text-emerald-600 mb-1 uppercase">Cash</label>
-                        <input type="number" id="i_cash" placeholder="0" class="form-input border-emerald-100 bg-emerald-50/20" oninput="validatePremium()">
+                        <input type="number" id="i_cash" placeholder="0" class="form-input border-emerald-100 bg-emerald-50/20" oninput="hidePremiumError()">
                     </div>
                     <div id="wrapper_paytm" class="hidden">
                         <label class="block text-[10px] font-bold text-blue-600 mb-1 uppercase">Paytm</label>
-                        <input type="number" id="i_paytm" placeholder="0" class="form-input border-blue-100 bg-blue-50/20" oninput="validatePremium()">
+                        <input type="number" id="i_paytm" placeholder="0" class="form-input border-blue-100 bg-blue-50/20" oninput="hidePremiumError()">
                     </div>
                     <div id="wrapper_udhar" class="hidden">
                         <label class="block text-[10px] font-bold text-rose-600 mb-1 uppercase">Udhar</label>
-                        <input type="number" id="i_udhar" placeholder="0" class="form-input border-rose-100 bg-rose-50/20" oninput="validatePremium()">
+                        <input type="number" id="i_udhar" placeholder="0" class="form-input border-rose-100 bg-rose-50/20" oninput="hidePremiumError()">
                     </div>
                     
                     <!-- Compact Payout & Error Message combination -->
@@ -266,8 +266,8 @@
                         <!-- PREMIUM VARIANCE WARNING (Compact & Hidden by default) -->
                         <div id="premiumWarningBox" class="hidden flex-1 items-center bg-rose-50 border border-rose-200 text-rose-700 px-2 py-1.5 rounded-md shadow-sm h-[38px]">
                             <div>
-                                <p class="font-bold text-[10px] uppercase leading-none">Mismatch!</p>
-                                <p class="text-[9px] leading-tight mt-0.5">Prem ₹<span id="errPremiumVal">0</span> ≠ Sum ₹<span id="errPaymentSum">0</span></p>
+                                <p class="font-bold text-[10px] uppercase leading-none">Variance: <span class="text-rose-600">₹<span id="errVariance">0</span></span></p>
+                                <p class="text-[9px] leading-tight mt-0.5 text-rose-500">Prem ₹<span id="errPremiumVal">0</span> ≠ Sum ₹<span id="errPaymentSum">0</span></p>
                             </div>
                         </div>
                     </div>
@@ -608,8 +608,11 @@
         }
 
         function validatePremium() {
-            // New logic: Do not validate if "New" is selected
-            if (inputs.newOld.value === 'New') {
+            const isRenewal = inputs.newOld.value === 'Renewal';
+            const isMasha = inputs.networkName.value === 'MASHA SHOWROOM';
+            
+            // New logic: Do not validate if "New" is selected OR network is not MASHA SHOWROOM
+            if (!isRenewal || !isMasha) {
                 hidePremiumError();
                 return true;
             }
@@ -622,8 +625,10 @@
             const hasValues = inputs.premium.value || inputs.cash.value || inputs.paytm.value || inputs.udhar.value;
 
             if (hasValues && premium !== paymentSum) {
+                const variance = premium - paymentSum;
                 document.getElementById('errPremiumVal').textContent = premium;
                 document.getElementById('errPaymentSum').textContent = paymentSum;
+                document.getElementById('errVariance').textContent = Math.abs(variance);
                 document.getElementById('premiumWarningBox').classList.replace('hidden', 'flex');
                 return false; 
             }
@@ -631,40 +636,52 @@
             return true;
         }
 
-        function handleNewOldToggle() {
+        function updatePaymentVisibility() {
             const wCash = document.getElementById('wrapper_cash');
             const wPaytm = document.getElementById('wrapper_paytm');
             const wUdhar = document.getElementById('wrapper_udhar');
 
-            if (inputs.newOld.value === 'New') {
-                inputs.regNumber.value = 'New'; inputs.regNumber.readOnly = true;
-                if(inputs.invNumber.value === 'Old') inputs.invNumber.value = '';
-                
+            const isRenewal = inputs.newOld.value === 'Renewal';
+            const isMasha = inputs.networkName.value === 'MASHA SHOWROOM';
+
+            if (isRenewal && isMasha) {
+                // Show payment fields
+                wCash.classList.remove('hidden');
+                wPaytm.classList.remove('hidden');
+                wUdhar.classList.remove('hidden');
+            } else {
                 // Hide payment fields
                 wCash.classList.add('hidden');
                 wPaytm.classList.add('hidden');
                 wUdhar.classList.add('hidden');
                 
                 // Reset them so no stray data is accidentally saved
-                inputs.cash.value = '0';
-                inputs.paytm.value = '0';
-                inputs.udhar.value = '0';
+                inputs.cash.value = '';
+                inputs.paytm.value = '';
+                inputs.udhar.value = '';
                 
                 hidePremiumError();
+            }
+        }
+
+        function handleNewOldToggle() {
+            if (inputs.newOld.value === 'New') {
+                inputs.regNumber.value = 'New'; inputs.regNumber.readOnly = true;
+                if(inputs.invNumber.value === 'Old') inputs.invNumber.value = '';
             } else {
                 inputs.regNumber.value = ''; inputs.regNumber.readOnly = false;
                 inputs.invNumber.value = 'Old';
-                
-                // Show payment fields
-                wCash.classList.remove('hidden');
-                wPaytm.classList.remove('hidden');
-                wUdhar.classList.remove('hidden');
             }
             updateEndDate();
+            updatePaymentVisibility();
             validatePremium(); // re-check validation state
         }
 
         inputs.newOld.addEventListener('change', handleNewOldToggle);
+        inputs.networkName.addEventListener('change', () => { 
+            updatePaymentVisibility(); 
+            validatePremium(); 
+        });
         
         inputs.date.addEventListener('change', () => { 
             fetchTodayEntries(); 
@@ -888,7 +905,7 @@
                 }
             }
             
-            // VALIDATE PREMIUM (only if Renewal)
+            // VALIDATE PREMIUM (only if Renewal and MASHA SHOWROOM)
             if (!validatePremium()) {
                 showToast("Premium mismatch! Please fix.", "error");
                 inputs.premium.focus();

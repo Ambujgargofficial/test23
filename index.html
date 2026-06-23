@@ -217,12 +217,18 @@
                         <input type="text" id="i_frames" placeholder="Chassis No" class="form-input">
                     </div>
                     <div>
-                        <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Policy Start <span class="text-rose-500">*</span></label>
-                        <input type="date" id="i_startDate" class="form-input">
+                        <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Tenure <span class="text-rose-500">*</span></label>
+                        <select id="i_tenure" class="form-input font-medium text-slate-900" onchange="updateEndDate()">
+                            <option value="1 Year" selected>1 Year</option>
+                            <option value="2 Years">2 Years</option>
+                            <option value="3 Years">3 Years</option>
+                            <option value="4 Years">4 Years</option>
+                            <option value="5 Years">5 Years</option>
+                        </select>
                     </div>
                     <div>
                         <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Policy End <span class="text-rose-500">*</span></label>
-                        <input type="date" id="i_endDate" readonly class="form-input">
+                        <input type="date" id="i_endDate" class="form-input">
                     </div>
                     <div>
                         <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Od Value <span class="text-rose-500">*</span></label>
@@ -427,7 +433,7 @@
                                 <th class="p-3 border-b border-slate-200">Customer Name</th>
                                 <th class="p-3 border-b border-slate-200">Reg Number</th>
                                 <th class="p-3 border-b border-slate-200">Premium</th>
-                                <th class="p-3 border-b border-slate-200">Start Date</th>
+                                <th class="p-3 border-b border-slate-200">Tenure</th>
                             </tr>
                         </thead>
                         <tbody id="drillDownBody" class="divide-y divide-slate-100"></tbody>
@@ -502,7 +508,7 @@
             customerName: document.getElementById('i_customerName'), mobile: document.getElementById('i_mobile'),
             policyNumber: document.getElementById('i_policyNumber'), odValue: document.getElementById('i_odValue'),
             premium: document.getElementById('i_premium'), frames: document.getElementById('i_frames'),
-            regNumber: document.getElementById('i_regNumber'), startDate: document.getElementById('i_startDate'),
+            regNumber: document.getElementById('i_regNumber'), tenure: document.getElementById('i_tenure'),
             endDate: document.getElementById('i_endDate'), cash: document.getElementById('i_cash'),
             paytm: document.getElementById('i_paytm'), udhar: document.getElementById('i_udhar'),
             remark: document.getElementById('i_remark'), payout: document.getElementById('i_payout')
@@ -574,28 +580,45 @@
         function getTodayString() {
             const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         }
-        function calculateEndDate(startStr) {
-            if (!startStr) return '';
-            const d = new Date(startStr);
-            if(isNaN(d.getTime())) return '';
-            d.setFullYear(d.getFullYear() + 1); d.setDate(d.getDate() - 1);
-            return d.toISOString().split('T')[0];
+        
+        function updateEndDate() {
+            const baseDateStr = inputs.date.value;
+            if(!baseDateStr) return;
+            
+            const parts = baseDateStr.split('-');
+            if(parts.length !== 3) return;
+            
+            const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+            const tenureText = inputs.tenure.value;
+            const years = parseInt(tenureText) || 1;
+            
+            d.setFullYear(d.getFullYear() + years);
+            d.setDate(d.getDate() - 1);
+            
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            
+            inputs.endDate.value = `${yyyy}-${mm}-${dd}`;
         }
 
         function handleNewOldToggle() {
             if (inputs.newOld.value === 'New') {
                 inputs.regNumber.value = 'New'; inputs.regNumber.readOnly = true;
-                inputs.startDate.value = getTodayString(); inputs.startDate.readOnly = true;
-                inputs.endDate.value = calculateEndDate(inputs.startDate.value);
+                if(inputs.invNumber.value === 'Old') inputs.invNumber.value = '';
             } else {
                 inputs.regNumber.value = ''; inputs.regNumber.readOnly = false;
-                inputs.startDate.value = ''; inputs.startDate.readOnly = false; inputs.endDate.value = '';
+                inputs.invNumber.value = 'Old';
             }
+            updateEndDate();
         }
 
         inputs.newOld.addEventListener('change', handleNewOldToggle);
-        inputs.startDate.addEventListener('change', () => { inputs.endDate.value = calculateEndDate(inputs.startDate.value); });
-        inputs.date.addEventListener('change', fetchTodayEntries);
+        
+        inputs.date.addEventListener('change', () => { 
+            fetchTodayEntries(); 
+            updateEndDate(); 
+        });
 
         function initializeApp() {
             const today = getTodayString();
@@ -604,6 +627,7 @@
             master.targetDate.value = today;
             master.chequeDate.value = today;
             handleNewOldToggle(); 
+            updateEndDate();
             
             // Auto fetch Last SN from Google Sheet
             fetchLastSN();
@@ -804,7 +828,7 @@
                 { id: 'regNumber', name: 'Reg Number' },
                 { id: 'policyNumber', name: 'Policy Number' },
                 { id: 'frames', name: 'FRAMEs/Chassis' },
-                { id: 'startDate', name: 'Policy Start' },
+                { id: 'tenure', name: 'Tenure' },
                 { id: 'endDate', name: 'Policy End' },
                 { id: 'odValue', name: 'Od Value' },
                 { id: 'premium', name: 'Premium' }
@@ -848,7 +872,11 @@
                 mobile: inputs.mobile.value, policyNumber: inputs.policyNumber.value,
                 odValue: inputs.odValue.value, premium: inputs.premium.value,
                 frames: inputs.frames.value, regNumber: inputs.regNumber.value,
-                startDate: formatDateToDisplay(inputs.startDate.value), endDate: formatDateToDisplay(inputs.endDate.value),
+                
+                // Saving Tenure exactly where Start Date used to be
+                startDate: inputs.tenure.value, 
+                
+                endDate: formatDateToDisplay(inputs.endDate.value),
                 cash: inputs.cash.value, paytm: inputs.paytm.value, udhar: inputs.udhar.value, remark: inputs.remark.value,
                 
                 // Policy is saved blank; it will be assigned a cheque later during Master Cheque Setup
@@ -864,6 +892,7 @@
                 
                 // Reset Policy Form
                 ['invNumber', 'modelName', 'customerName', 'mobile', 'policyNumber', 'odValue', 'premium', 'frames', 'cash', 'paytm', 'udhar', 'remark', 'payout'].forEach(id => inputs[id].value = '');
+                inputs.tenure.value = '1 Year';
                 handleNewOldToggle(); 
                 hidePremiumError(); // Reset the error box
                 window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -954,7 +983,7 @@
                     tbody.innerHTML = (!result.data || result.data.length === 0) ? `<tr><td colspan="5" class="p-8 text-center">No policies found.</td></tr>` : '';
                     result.data.forEach(rec => {
                         const tr = document.createElement('tr'); tr.className = "bg-white hover:bg-slate-50";
-                        tr.innerHTML = `<td class="p-3 border-b text-center font-mono">${rec.sn}</td><td class="p-3 border-b font-semibold">${rec.customerName}</td><td class="p-3 border-b font-mono text-xs">${rec.regNumber}</td><td class="p-3 border-b font-bold">₹${rec.premium}</td><td class="p-3 border-b">${formatDateToDisplay(rec.startDate)}</td>`;
+                        tr.innerHTML = `<td class="p-3 border-b text-center font-mono">${rec.sn}</td><td class="p-3 border-b font-semibold">${rec.customerName}</td><td class="p-3 border-b font-mono text-xs">${rec.regNumber}</td><td class="p-3 border-b font-bold">₹${rec.premium}</td><td class="p-3 border-b">${rec.startDate}</td>`;
                         tbody.appendChild(tr);
                     });
                 });

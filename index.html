@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Insurance Data Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        ::-webkit-scrollbar { height: 8px; width: 8px; }
+        ::-webkit-scrollbar-track { background: #f8fafc; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .form-input {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            background-color: #ffffff;
+            color: #1e293b;
+            transition: all 0.2s ease;
+        }
+        .form-input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); }
+        .form-input[readonly] { background-color: #f1f5f9; color: #64748b; cursor: not-allowed; }
+        
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+
+        @keyframes slideIn { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .toast-animate { animation: slideIn 0.3s ease forwards; }
+
+        .sidebar-item-active { background-color: rgba(99, 102, 241, 0.15); color: #818cf8; border-right: 3px solid #818cf8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-screen flex overflow-hidden">
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-[60] flex flex-col gap-2"></div>
+
+    <!-- SIDEBAR OVERLAY (Click outside to close) -->
+    <div id="sidebarOverlay" onclick="toggleSidebar(false)" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 hidden transition-opacity"></div>
+
+    <!-- CLEAR UDHAR MODAL -->
+    <div id="udharModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden justify-center items-center p-4 transition-opacity">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm flex flex-col overflow-hidden ring-1 ring-slate-900/10">
+            <div class="bg-indigo-50 border-b border-indigo-100 px-5 py-4 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-indigo-900">Clear Udhar Payment</h3>
+                <button onclick="closeUdharModal()" class="text-slate-400 hover:text-slate-600 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-5 space-y-4">
+                <div class="bg-slate-50 p-3 rounded border border-slate-200">
+                    <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Customer</p>
+                    <p class="font-semibold text-slate-800" id="modUdharName">-</p>
+                    <div class="flex gap-4 mt-2">
+                        <div>
+                            <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">SN</p>
+                            <p class="text-sm font-mono text-slate-600" id="modUdharSn">-</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-rose-500 font-bold uppercase tracking-wider">Udhar Amount</p>
+                            <p class="text-sm font-bold text-rose-600">₹<span id="modUdharAmount">0</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-2 uppercase">Payment Mode Received</label>
+                    <select id="modPaymentMode" class="form-input border-slate-300 font-medium">
+                        <option value="Cash">Cash</option>
+                        <option value="Paytm">Paytm</option>
+                    </select>
+                </div>
+            </div>
+            <div class="bg-slate-50 px-5 py-4 border-t border-slate-200 flex justify-end gap-3">
+                <button onclick="closeUdharModal()" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">Cancel</button>
+                <button id="btnConfirmUdhar" onclick="submitUdharClear()" class="px-4 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors flex items-center gap-2">
+                    <span id="btnIconUdhar"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></span>
+                    <span id="btnTextUdhar">Confirm Payment</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- LEFT SIDEBAR (Drawer) -->
+    <aside id="sidebar" class="fixed inset-y-0 left-0 w-64 bg-slate-900 text-white flex flex-col shadow-2xl z-40 transform -translate-x-full transition-transform duration-300 ease-in-out">
+        <div class="p-5 border-b border-slate-800 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-600 p-2 rounded-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                </div>
+                <h1 class="text-lg font-bold tracking-wide leading-tight">Insurance<br>Master</h1>
+            </div>
+            <button onclick="toggleSidebar(false)" class="text-slate-400 hover:text-white md:hidden">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <nav class="flex-grow py-4 flex flex-col gap-1 px-3">
+            <button onclick="switchView('viewDataEntry')" id="navDataEntry" class="sidebar-item-active flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                Data Entry
+            </button>
+            <button onclick="switchView('viewChequeSetup')" id="navChequeSetup" class="text-slate-400 flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 hover:text-slate-200">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                Master Cheque Setup
+            </button>
+            <button onclick="switchView('viewPendingCheques')" id="navPendingCheques" class="text-slate-400 flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 hover:text-slate-200">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                Pending Cheques
+            </button>
+            <button onclick="switchView('viewPendingUdhar')" id="navPendingUdhar" class="text-slate-400 flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 hover:text-slate-200">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                Pending Udhar
+            </button>
+        </nav>
+    </aside>
+
+    <!-- MAIN APP AREA -->
+    <div class="flex-1 flex flex-col h-screen overflow-hidden">
+        
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b border-slate-200 px-4 py-4 flex items-center justify-between z-10 shrink-0">
+            <div class="flex items-center gap-4">
+                <button onclick="toggleSidebar(true)" class="p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-md transition-colors" title="Open Menu">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                </button>
+                <h2 id="headerTitle" class="text-xl font-bold text-slate-800">Policy Entry</h2>
+            </div>
+            <div class="text-xs md:text-sm font-semibold text-slate-500 uppercase" id="currentDateDisplay"></div>
+        </header>
+
+        <!-- VIEW 1: DATA ENTRY -->
+        <main id="viewDataEntry" class="flex-1 overflow-y-auto p-4 md:p-6 w-full max-w-7xl mx-auto space-y-6 relative pb-20">
+            
+            <!-- Policy Form -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 ring-1 ring-slate-900/5">
+                <div class="flex justify-between items-center mb-5 pb-3 border-b border-slate-100">
+                    <h2 class="text-md font-semibold text-slate-800">Policy Details</h2>
+                    <span class="bg-slate-100 text-slate-700 py-1 px-3 rounded-md text-xs font-bold">SN: <span id="nextSnDisplay">1</span></span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-x-4 gap-y-5">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Date <span class="text-rose-500">*</span></label>
+                        <input type="date" id="i_date" class="form-input">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Ins. Company <span class="text-rose-500">*</span></label>
+                        <select id="i_insCompany" class="form-input font-medium text-slate-900">
+                            <option value="ICICI LOMBARD" selected>ICICI LOMBARD</option>
+                            <option value="SHRIRAM CITY">SHRIRAM CITY</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Network Name <span class="text-rose-500">*</span></label>
+                        <select id="i_networkName" class="form-input">
+                            <option value="MASHA SHOWROOM">MASHA SHOWROOM</option>
+                            <option value="DEBAI-AGARWAL HONDA">DEBAI-AGARWAL HONDA</option>
+                            <option value="JAHANGIRABAD-BHAGIRATHI HONDA">JAHANGIRABAD-BHAGIRATHI HONDA</option>
+                            <option value="PAHASU-TOSHI HONDA">PAHASU-TOSHI HONDA</option>
+                            <option value="CHHATARI-CHAUHAN HONDA">CHHATARI-CHAUHAN HONDA</option>
+                            <option value="JHAJHAR-UDAI HONDA">JHAJHAR-UDAI HONDA</option>
+                            <option value="SHIKARPUR-VEER HONDA">SHIKARPUR-VEER HONDA</option>
+                            <option value="GULAOTHI-ALUZAIR HONDA">GULAOTHI-ALUZAIR HONDA</option>
+                            <option value="AHMADGARH- SHRI BALAJI HONDA">AHMADGARH- SHRI BALAJI HONDA</option>
+                            <option value="KAKORE-BALAJI HONDA">KAKORE-BALAJI HONDA</option>
+                            <option value="SIKANDRABAD-BALA JI ADESH">SIKANDRABAD-BALA JI ADESH</option>
+                            <option value="ANOOPSHAHR-GANGA HONDA">ANOOPSHAHR-GANGA HONDA</option>
+                            <option value="JHAJHAR-HBD AUTOMOBILES">JHAJHAR-HBD AUTOMOBILES</option>
+                            <option value="AURANGABAD-SHIVSHAKTI HONDA">AURANGABAD-SHIVSHAKTI HONDA</option>
+                            <option value="EC SIYANA- SHREE SHYAM HONDA">EC SIYANA- SHREE SHYAM HONDA</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">New/Old <span class="text-rose-500">*</span></label>
+                        <select id="i_newOld" class="form-input font-bold text-indigo-700 bg-indigo-50/50">
+                            <option value="New" selected>New</option>
+                            <option value="Renewal">Renewal</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-rose-500 mb-1 uppercase">Customer Name *</label>
+                        <input type="text" id="i_customerName" placeholder="Enter Full Name" class="form-input border-rose-100 bg-rose-50/10">
+                    </div>
+
+                    <!-- Details -->
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Mobile <span class="text-rose-500">*</span></label>
+                        <input type="text" id="i_mobile" placeholder="10 Digits" maxlength="10" pattern="\d{10}" class="form-input">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Model Name <span class="text-rose-500">*</span></label>
+                        <input type="text" id="i_modelName" placeholder="Vehicle Model" class="form-input">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Inv. Number <span class="text-rose-500">*</span></label>
+                        <input type="text" id="i_invNumber" placeholder="Invoice #" class="form-input">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Reg Number <span class="text-rose-500">*</span></label>
+                        <input type="text" id="i_regNumber" placeholder="Registration #" class="form-input">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Policy Number <span class="text-rose-500">*</span></label>
+                        <input type="text" id="i_policyNumber" placeholder="Policy #" class="form-input">
+                    </div>
+
+                    <!-- Policy Details -->
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">FRAMEs/Chassis <span class="text-rose-500">*</span></label>
+                        <input type="text" id="i_frames" placeholder="Chassis No" class="form-input">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Policy Start <span class="text-rose-500">*</span></label>
+                        <input type="date" id="i_startDate" class="form-input">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Policy End <span class="text-rose-500">*</span></label>
+                        <input type="date" id="i_endDate" readonly class="form-input">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Od Value <span class="text-rose-500">*</span></label>
+                        <input type="number" id="i_odValue" placeholder="0" class="form-input">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-indigo-600 mb-1 uppercase">Premium <span class="text-rose-500">*</span></label>
+                        <input type="number" id="i_premium" placeholder="0" class="form-input border-indigo-200 bg-indigo-50/20" oninput="hidePremiumError()">
+                    </div>
+
+                    <!-- Payment Section -->
+                    <div class="xl:col-span-5 border-t border-slate-100 mt-2 pt-4"></div>
+                    
+                    <div>
+                        <label class="block text-[10px] font-bold text-emerald-600 mb-1 uppercase">Cash</label>
+                        <input type="number" id="i_cash" placeholder="0" class="form-input border-emerald-100 bg-emerald-50/20" oninput="hidePremiumError()">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-blue-600 mb-1 uppercase">Paytm</label>
+                        <input type="number" id="i_paytm" placeholder="0" class="form-input border-blue-100 bg-blue-50/20" oninput="hidePremiumError()">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-rose-600 mb-1 uppercase">Udhar</label>
+                        <input type="number" id="i_udhar" placeholder="0" class="form-input border-rose-100 bg-rose-50/20" oninput="hidePremiumError()">
+                    </div>
+                    
+                    <!-- Compact Payout & Error Message combination -->
+                    <div class="xl:col-span-2 flex items-end gap-3">
+                        <div class="flex-1">
+                            <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Payout</label>
+                            <input type="number" id="i_payout" placeholder="0" class="form-input">
+                        </div>
+                        
+                        <!-- PREMIUM VARIANCE WARNING (Compact & Hidden by default) -->
+                        <div id="premiumWarningBox" class="hidden flex-1 items-center bg-rose-50 border border-rose-200 text-rose-700 px-2 py-1.5 rounded-md shadow-sm h-[38px]">
+                            <div>
+                                <p class="font-bold text-[10px] uppercase leading-none">Mismatch!</p>
+                                <p class="text-[9px] leading-tight mt-0.5">Prem ₹<span id="errPremiumVal">0</span> ≠ Sum ₹<span id="errPaymentSum">0</span></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Remarks Section -->
+                    <div class="sm:col-span-2 md:col-span-2 xl:col-span-3">
+                        <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Remarks</label>
+                        <input type="text" id="i_remark" placeholder="Notes..." class="form-input">
+                    </div>
+
+                    <div class="flex items-end h-full mt-2 sm:mt-0 xl:col-span-2 md:col-span-1 xl:col-start-4">
+                        <button id="savePolicyBtn" onclick="savePolicyData()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-[0.6rem] px-4 rounded-lg shadow-md transition-all flex items-center gap-2 w-full justify-center">
+                            <span id="btnIconPolicy"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z" /></svg></span>
+                            <span id="btnTextPolicy" class="text-sm">Save Policy</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Session Entries -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden ring-1 ring-slate-900/5">
+                <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                    <h2 class="text-sm font-semibold text-slate-700">Today's Saved Entries (Live)</h2>
+                    <button onclick="fetchTodayEntries()" class="text-[10px] bg-white border border-slate-300 text-slate-600 px-2 py-1 rounded hover:bg-slate-100 transition-colors shadow-sm">Refresh Table</button>
+                </div>
+                <div class="overflow-x-auto max-h-[300px]">
+                    <table class="w-full text-left border-collapse whitespace-nowrap">
+                        <thead class="bg-slate-800 text-slate-100 sticky top-0 text-[10px] uppercase font-semibold">
+                            <tr>
+                                <th class="p-3 text-center border-b border-slate-700">SN</th>
+                                <th class="p-3 border-b border-slate-700">Customer Name</th>
+                                <th class="p-3 border-b border-slate-700">Reg Number</th>
+                                <th class="p-3 border-b border-slate-700">Premium</th>
+                                <th class="p-3 border-b border-slate-700">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sessionTableBody" class="divide-y divide-slate-100">
+                            <tr><td colspan="5" class="p-6 text-center text-xs text-slate-400">Loading today's entries...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+
+        <!-- VIEW 2: MASTER CHEQUE SETUP -->
+        <main id="viewChequeSetup" class="hidden flex-1 overflow-y-auto p-4 md:p-6 w-full max-w-3xl mx-auto space-y-6 pb-20">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="bg-gradient-to-r from-indigo-50 to-white p-6 border-b border-slate-100">
+                    <h2 class="text-xl font-bold text-indigo-900 mb-1">Master Cheque Setup</h2>
+                    <p class="text-sm text-slate-500">Link a cheque to policies entered on a specific date. The system matches the premium sum with your cheque amount automatically.</p>
+                </div>
+                
+                <div class="p-6 space-y-6">
+                    <!-- Step 1: Select Date -->
+                    <div id="step1DateSelection" class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                        <label class="block text-xs font-bold text-slate-700 mb-2 uppercase">1. Select Policy Entry Date</label>
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <input type="date" id="m_targetDate" class="form-input border-slate-300 sm:max-w-[200px]" onchange="fetchDateSummary()">
+                            <button onclick="fetchDateSummary()" class="bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 px-4 py-2 rounded-md text-sm font-semibold transition-colors">Fetch Policies</button>
+                        </div>
+                        
+                        <!-- Summary Result -->
+                        <div id="dateSummaryBox" class="mt-4 hidden flex-col sm:flex-row gap-4">
+                            <div class="bg-indigo-100 text-indigo-800 px-4 py-3 rounded-md flex-1">
+                                <p class="text-[10px] font-bold uppercase tracking-wider mb-1">Policies Found</p>
+                                <p class="text-xl font-black" id="lblFetchedCount">0</p>
+                            </div>
+                            <div class="bg-emerald-100 text-emerald-800 px-4 py-3 rounded-md flex-1">
+                                <p class="text-[10px] font-bold uppercase tracking-wider mb-1">Total Premium Sum</p>
+                                <p class="text-xl font-black">₹<span id="lblFetchedPremium">0</span></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Cheque Details -->
+                    <div id="chequeDetailsSection" class="opacity-50 pointer-events-none transition-opacity duration-300">
+                        <label class="block text-xs font-bold text-slate-700 mb-4 uppercase">2. Enter Cheque Details</label>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Cheque No.</label>
+                                <input type="text" id="m_chequeNo" placeholder="Enter Cheque #" class="form-input border-slate-300">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Amount Paid By Cheque</label>
+                                <input type="number" id="m_amountPaidByCheque" placeholder="0" class="form-input border-slate-300" oninput="calculateVariance()">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Cheque Date</label>
+                                <input type="date" id="m_chequeDate" class="form-input border-slate-300">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Cheque Send Date <span class="text-amber-600 normal-case ml-1">(Optional)</span></label>
+                                <input type="date" id="m_chequeSendDate" class="form-input border-slate-300">
+                            </div>
+                        </div>
+
+                        <!-- Variance Warning -->
+                        <div id="varianceWarningBox" class="mt-5 bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-md hidden items-center gap-3 shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                            <div>
+                                <p class="font-bold text-sm">Amount Mismatch Error!</p>
+                                <p class="text-xs">Cheque amount (₹<span id="errCmt">0</span>) does not match total premium (₹<span id="errPmt">0</span>). Fix the amount to proceed.</p>
+                            </div>
+                        </div>
+
+                        <div class="pt-5 flex justify-end">
+                            <button id="saveChequeBtn" disabled onclick="saveChequeData()" class="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-2.5 px-6 rounded-lg shadow-md transition-colors flex items-center gap-2">
+                                <span id="btnIconCheque"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></span>
+                                <span id="btnTextCheque">Link Cheque to Policies</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- VIEW 3: PENDING CHEQUES -->
+        <main id="viewPendingCheques" class="hidden flex-1 overflow-y-auto p-4 md:p-6 w-full max-w-7xl mx-auto space-y-6 pb-20">
+            <div class="flex justify-between items-center mb-2">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800">Pending Cheques Report</h2>
+                    <p class="text-sm text-slate-500">Fetching live from `Cheques_Master` sheet</p>
+                </div>
+                <button onclick="fetchPendingSummary()" id="refreshBtn" class="flex items-center gap-1.5 text-sm bg-white border border-slate-200 shadow-sm text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50">
+                    <svg id="refreshIcon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    Refresh
+                </button>
+            </div>
+
+            <div id="pendingSummaryView" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse whitespace-nowrap">
+                        <thead class="bg-amber-50 text-amber-900 border-b border-amber-100 text-xs uppercase font-semibold">
+                            <tr>
+                                <th class="p-4">Date</th>
+                            <th class="p-4">Company</th>
+                            <th class="p-4">Cheque No.</th>
+                            <th class="p-4 text-center">Policies</th>
+                            <th class="p-4 text-right">Amount Paid</th>
+                            <th class="p-4 text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pendingSummaryBody" class="divide-y divide-slate-100">
+                        <tr><td colspan="6" class="p-8 text-center text-sm text-slate-500">Loading pending cheques...</td></tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+
+            <!-- Drill Down -->
+            <div id="pendingDrillDownView" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="bg-indigo-50 border-b border-indigo-100 p-4 flex items-center gap-4">
+                    <button onclick="backToSummary()" class="text-indigo-700 bg-white border border-indigo-200 hover:bg-indigo-100 px-3 py-1.5 rounded-md text-sm font-semibold flex items-center gap-1 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                        Back
+                    </button>
+                    <h3 class="text-lg font-bold text-indigo-900">Policies for Cheque: <span id="drillDownChequeNo"></span></h3>
+                </div>
+                <div class="overflow-x-auto max-h-[60vh]">
+                    <table class="w-full text-left border-collapse whitespace-nowrap">
+                        <thead class="bg-slate-100 text-slate-600 sticky top-0 text-[10px] uppercase font-bold z-10">
+                            <tr>
+                                <th class="p-3 text-center border-b border-slate-200">SN</th>
+                                <th class="p-3 border-b border-slate-200">Customer Name</th>
+                                <th class="p-3 border-b border-slate-200">Reg Number</th>
+                                <th class="p-3 border-b border-slate-200">Premium</th>
+                                <th class="p-3 border-b border-slate-200">Start Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="drillDownBody" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+
+        <!-- VIEW 4: PENDING UDHAR TRACKER -->
+        <main id="viewPendingUdhar" class="hidden flex-1 overflow-y-auto p-4 md:p-6 w-full max-w-7xl mx-auto space-y-6 pb-20">
+            <div class="flex justify-between items-center mb-2">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800">Pending Udhar Tracker</h2>
+                    <p class="text-sm text-slate-500">Policies with unpaid credit (Udhar > 0)</p>
+                </div>
+                <button onclick="fetchPendingUdhar()" id="refreshUdharBtn" class="flex items-center gap-1.5 text-sm bg-white border border-slate-200 shadow-sm text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50">
+                    <svg id="refreshUdharIcon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    Refresh
+                </button>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse whitespace-nowrap">
+                        <thead class="bg-rose-50 text-rose-900 border-b border-rose-100 text-xs uppercase font-semibold">
+                            <tr>
+                                <th class="p-4 text-center">SN</th>
+                                <th class="p-4">Date</th>
+                                <th class="p-4">Customer Name</th>
+                                <th class="p-4">Mobile</th>
+                                <th class="p-4">Total Premium</th>
+                                <th class="p-4 text-right">Pending Udhar</th>
+                                <th class="p-4 text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pendingUdharBody" class="divide-y divide-slate-100">
+                            <tr><td colspan="7" class="p-8 text-center text-sm text-slate-500">Loading pending udhar...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ==========================================
+        // Google Apps Script Web App URL
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwBwe9N6tcoQWKvW_ad8mpwjI9-s2cGQ-2t6wa5hWeWfaX5ysLpHWKrnOZmbJfrEh-ivg/exec"; 
+        // ==========================================
+        
+        let currentSN = Math.floor(Math.random() * 1000) + 5000; 
+        
+        let fetchedPremiumSum = 0;
+        let isUpdatingCheque = false;
+        
+        // Active Udhar Clear State
+        let activeUdharClear = { sn: "", name: "", amount: "" };
+
+        // DOM Setup Inputs
+        const master = {
+            targetDate: document.getElementById('m_targetDate'),
+            chequeNo: document.getElementById('m_chequeNo'),
+            chequeDate: document.getElementById('m_chequeDate'),
+            chequeSendDate: document.getElementById('m_chequeSendDate'),
+            amount: document.getElementById('m_amountPaidByCheque')
+        };
+
+        const inputs = {
+            date: document.getElementById('i_date'), insCompany: document.getElementById('i_insCompany'),
+            networkName: document.getElementById('i_networkName'), newOld: document.getElementById('i_newOld'),
+            invNumber: document.getElementById('i_invNumber'), modelName: document.getElementById('i_modelName'),
+            customerName: document.getElementById('i_customerName'), mobile: document.getElementById('i_mobile'),
+            policyNumber: document.getElementById('i_policyNumber'), odValue: document.getElementById('i_odValue'),
+            premium: document.getElementById('i_premium'), frames: document.getElementById('i_frames'),
+            regNumber: document.getElementById('i_regNumber'), startDate: document.getElementById('i_startDate'),
+            endDate: document.getElementById('i_endDate'), cash: document.getElementById('i_cash'),
+            paytm: document.getElementById('i_paytm'), udhar: document.getElementById('i_udhar'),
+            remark: document.getElementById('i_remark'), payout: document.getElementById('i_payout')
+        };
+
+        // --- UI & NAVIGATION ---
+        function toggleSidebar(show) {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (show) {
+                sidebar.classList.remove('-translate-x-full');
+                overlay.classList.remove('hidden');
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                overlay.classList.add('hidden');
+            }
+        }
+
+        function switchView(viewId) {
+            toggleSidebar(false); // auto hide
+            
+            // Reset cheque setup form if navigating to it normally
+            if(viewId === 'viewChequeSetup' && !isUpdatingCheque) {
+                resetChequeSetupForm();
+            }
+            
+            ['viewDataEntry', 'viewChequeSetup', 'viewPendingCheques', 'viewPendingUdhar'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById(viewId).classList.remove('hidden');
+
+            const activeClass = "sidebar-item-active flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800";
+            const inactiveClass = "text-slate-400 flex items-center gap-3 w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 hover:text-slate-200";
+
+            document.getElementById('navDataEntry').className = viewId === 'viewDataEntry' ? activeClass : inactiveClass;
+            document.getElementById('navChequeSetup').className = viewId === 'viewChequeSetup' ? activeClass : inactiveClass;
+            document.getElementById('navPendingCheques').className = viewId === 'viewPendingCheques' ? activeClass : inactiveClass;
+            document.getElementById('navPendingUdhar').className = viewId === 'viewPendingUdhar' ? activeClass : inactiveClass;
+
+            const titles = { viewDataEntry: "Policy Entry", viewChequeSetup: "Master Cheque Setup", viewPendingCheques: "Live Cheque Tracker", viewPendingUdhar: "Pending Udhar Tracker" };
+            document.getElementById('headerTitle').textContent = titles[viewId];
+
+            if(viewId === 'viewPendingCheques') fetchPendingSummary();
+            if(viewId === 'viewPendingUdhar') fetchPendingUdhar();
+        }
+
+        // --- HELPERS ---
+        function formatDateToDisplay(dateString) {
+            if (!dateString) return '';
+            
+            // Manual extraction to prevent Javascript Timezone shifting bugs
+            if (dateString.includes('-')) {
+                const parts = dateString.split('-');
+                if (parts.length === 3) {
+                    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                    return `${parts[2]}/${months[parseInt(parts[1], 10) - 1]}/${parts[0]}`;
+                }
+            }
+            
+            // Fallback for non-standard inputs
+            const d = new Date(dateString);
+            if (!isNaN(d.getTime())) {
+                const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                return `${String(d.getDate()).padStart(2, '0')}/${months[d.getMonth()]}/${d.getFullYear()}`;
+            }
+            return dateString;
+        }
+
+        function getTodayString() {
+            const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+        function calculateEndDate(startStr) {
+            if (!startStr) return '';
+            const d = new Date(startStr);
+            if(isNaN(d.getTime())) return '';
+            d.setFullYear(d.getFullYear() + 1); d.setDate(d.getDate() - 1);
+            return d.toISOString().split('T')[0];
+        }
+
+        function handleNewOldToggle() {
+            if (inputs.newOld.value === 'New') {
+                inputs.regNumber.value = 'New'; inputs.regNumber.readOnly = true;
+                inputs.startDate.value = getTodayString(); inputs.startDate.readOnly = true;
+                inputs.endDate.value = calculateEndDate(inputs.startDate.value);
+            } else {
+                inputs.regNumber.value = ''; inputs.regNumber.readOnly = false;
+                inputs.startDate.value = ''; inputs.startDate.readOnly = false; inputs.endDate.value = '';
+            }
+        }
+
+        inputs.newOld.addEventListener('change', handleNewOldToggle);
+        inputs.startDate.addEventListener('change', () => { inputs.endDate.value = calculateEndDate(inputs.startDate.value); });
+        inputs.date.addEventListener('change', fetchTodayEntries);
+
+        function initializeApp() {
+            const today = getTodayString();
+            document.getElementById('currentDateDisplay').textContent = formatDateToDisplay(today);
+            inputs.date.value = today;
+            master.targetDate.value = today;
+            master.chequeDate.value = today;
+            handleNewOldToggle(); 
+            
+            // Auto fetch Last SN from Google Sheet
+            fetchLastSN();
+
+            // Fetch live entries for today
+            fetchTodayEntries();
+        }
+
+        // --- CORE LOGIC ---
+        function fetchLastSN() {
+            document.getElementById('nextSnDisplay').textContent = "...";
+            fetch(GOOGLE_SCRIPT_URL + '?action=getLastSN')
+                .then(res => res.json())
+                .then(result => {
+                    if(result.result === 'success' && result.nextSN) {
+                        currentSN = result.nextSN;
+                    } else {
+                        currentSN = 1; // Fallback if sheet empty
+                    }
+                    document.getElementById('nextSnDisplay').textContent = currentSN;
+                })
+                .catch(err => {
+                    console.error("Error fetching SN:", err);
+                    currentSN = 1; 
+                    document.getElementById('nextSnDisplay').textContent = currentSN;
+                });
+        }
+
+        // Hides the compact error message when user starts correcting the payment values
+        function hidePremiumError() {
+            document.getElementById('premiumWarningBox').classList.replace('flex', 'hidden');
+        }
+
+        function resetChequeSetupForm() {
+            isUpdatingCheque = false;
+            document.getElementById('step1DateSelection').classList.remove('hidden');
+            document.getElementById('chequeDetailsSection').classList.add('opacity-50', 'pointer-events-none');
+            master.chequeNo.readOnly = false;
+            master.chequeNo.classList.remove('bg-slate-100');
+            master.chequeNo.value = '';
+            master.amount.value = '';
+            master.chequeSendDate.value = '';
+            master.chequeDate.value = getTodayString();
+            document.getElementById('btnTextCheque').textContent = "Link Cheque to Policies";
+            document.getElementById('saveChequeBtn').disabled = true;
+            document.getElementById('dateSummaryBox').classList.add('hidden');
+            document.getElementById('varianceWarningBox').classList.add('hidden');
+        }
+
+        function formatBackToInputDate(dateStr) {
+            if(!dateStr) return '';
+            const parts = dateStr.split('/');
+            if(parts.length !== 3) return '';
+            const months = {"Jan":"01", "Feb":"02", "Mar":"03", "Apr":"04", "May":"05", "Jun":"06", "Jul":"07", "Aug":"08", "Sep":"09", "Oct":"10", "Nov":"11", "Dec":"12"};
+            return `${parts[2]}-${months[parts[1]]}-${parts[0]}`;
+        }
+
+        function prepareUpdateCheque(cNo, cDate, cAmount) {
+            isUpdatingCheque = true;
+            
+            // Hide Step 1 and show Step 2 immediately
+            document.getElementById('step1DateSelection').classList.add('hidden');
+            document.getElementById('chequeDetailsSection').classList.remove('opacity-50', 'pointer-events-none');
+            
+            master.chequeNo.value = cNo;
+            master.chequeNo.readOnly = true; // Prevent changing the cheque number
+            master.chequeNo.classList.add('bg-slate-100');
+            
+            master.chequeDate.value = formatBackToInputDate(cDate);
+            master.amount.value = cAmount;
+            master.chequeSendDate.value = getTodayString(); // Suggest today as send date
+            
+            document.getElementById('btnTextCheque').textContent = "Save Send Date";
+            document.getElementById('varianceWarningBox').classList.add('hidden');
+            document.getElementById('saveChequeBtn').disabled = false;
+            
+            switchView('viewChequeSetup');
+        }
+
+        function fetchDateSummary() {
+            const tDateStr = formatDateToDisplay(master.targetDate.value);
+            if (!tDateStr) return;
+            
+            const btn = document.getElementById('saveChequeBtn');
+            btn.disabled = true;
+            document.getElementById('dateSummaryBox').classList.add('hidden');
+            document.getElementById('chequeDetailsSection').classList.add('opacity-50', 'pointer-events-none');
+            
+            showToast("Fetching policies...", "success");
+
+            fetch(GOOGLE_SCRIPT_URL + '?action=getDateSummary&date=' + encodeURIComponent(tDateStr))
+                .then(res => res.json())
+                .then(result => {
+                    if(result.result === 'success') {
+                        document.getElementById('lblFetchedCount').textContent = result.count;
+                        document.getElementById('lblFetchedPremium').textContent = result.totalPremium;
+                        fetchedPremiumSum = result.totalPremium;
+                        
+                        document.getElementById('dateSummaryBox').classList.replace('hidden', 'flex');
+                        
+                        if (result.count > 0) {
+                            document.getElementById('chequeDetailsSection').classList.remove('opacity-50', 'pointer-events-none');
+                            calculateVariance();
+                        } else {
+                            showToast("No unlinked policies found for this date", "error");
+                        }
+                    } else {
+                        showToast("Failed to fetch summary", "error");
+                    }
+                }).catch(err => {
+                    showToast("Network error fetching summary", "error");
+                });
+        }
+
+        function calculateVariance() {
+            const amount = parseFloat(master.amount.value) || 0;
+            const btn = document.getElementById('saveChequeBtn');
+            const warningBox = document.getElementById('varianceWarningBox');
+
+            if (!amount && !isUpdatingCheque) {
+                btn.disabled = true;
+                return;
+            }
+
+            if (isUpdatingCheque) {
+                // Ignore premium check when just updating send date
+                warningBox.classList.replace('flex', 'hidden');
+                btn.disabled = false;
+                return;
+            }
+
+            if (amount === fetchedPremiumSum && fetchedPremiumSum > 0) {
+                warningBox.classList.replace('flex', 'hidden');
+                btn.disabled = false;
+            } else {
+                document.getElementById('errCmt').textContent = amount;
+                document.getElementById('errPmt').textContent = fetchedPremiumSum;
+                warningBox.classList.replace('hidden', 'flex');
+                btn.disabled = true;
+            }
+        }
+
+        async function saveChequeData() {
+            if(!master.chequeNo.value.trim()) { showToast("Please enter Cheque Number", "error"); master.chequeNo.focus(); return; }
+            if(isUpdatingCheque && !master.chequeSendDate.value) { showToast("Please enter Send Date", "error"); master.chequeSendDate.focus(); return; }
+
+            const btn = document.getElementById('saveChequeBtn');
+            const btnText = document.getElementById('btnTextCheque');
+            btnText.textContent = isUpdatingCheque ? "Saving Send Date..." : "Linking..."; 
+            btn.disabled = true;
+
+            const payload = {
+                action: isUpdatingCheque ? 'updateChequeSendDate' : 'saveCheque',
+                chequeNo: master.chequeNo.value,
+                chequeDate: formatDateToDisplay(master.chequeDate.value),
+                chequeSendDate: formatDateToDisplay(master.chequeSendDate.value),
+                amount: master.amount.value || 0
+            };
+
+            if (!isUpdatingCheque) {
+                payload.targetPolicyDate = formatDateToDisplay(master.targetDate.value);
+            }
+
+            try {
+                await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                
+                if (isUpdatingCheque) {
+                    showToast("Send Date Updated!", "success");
+                    setTimeout(() => {
+                        resetChequeSetupForm();
+                        switchView('viewPendingCheques');
+                    }, 1000);
+                } else {
+                    showToast("Cheque Linked to Policies!", "success");
+                    setTimeout(() => {
+                        resetChequeSetupForm();
+                        switchView('viewDataEntry');
+                    }, 1000);
+                }
+            } catch(e) {
+                showToast("Failed to save cheque", "error");
+                btnText.textContent = isUpdatingCheque ? "Save Send Date" : "Link Cheque to Policies"; 
+                btn.disabled = false;
+            }
+        }
+
+        async function savePolicyData() {
+            // REQUIRED FIELDS VALIDATION
+            const requiredFields = [
+                { id: 'date', name: 'Date' },
+                { id: 'insCompany', name: 'Ins. Company' },
+                { id: 'networkName', name: 'Network Name' },
+                { id: 'newOld', name: 'New/Old' },
+                { id: 'customerName', name: 'Customer Name' },
+                { id: 'mobile', name: 'Mobile' },
+                { id: 'modelName', name: 'Model Name' },
+                { id: 'invNumber', name: 'Inv. Number' },
+                { id: 'regNumber', name: 'Reg Number' },
+                { id: 'policyNumber', name: 'Policy Number' },
+                { id: 'frames', name: 'FRAMEs/Chassis' },
+                { id: 'startDate', name: 'Policy Start' },
+                { id: 'endDate', name: 'Policy End' },
+                { id: 'odValue', name: 'Od Value' },
+                { id: 'premium', name: 'Premium' }
+            ];
+
+            for (let field of requiredFields) {
+                if (!inputs[field.id].value.trim()) {
+                    showToast(`${field.name} is required!`, "error");
+                    inputs[field.id].focus();
+                    return;
+                }
+            }
+            
+            // VALIDATION ONLY HAPPENS ON SAVE
+            const premium = parseFloat(inputs.premium.value) || 0;
+            const cash = parseFloat(inputs.cash.value) || 0;
+            const paytm = parseFloat(inputs.paytm.value) || 0;
+            const udhar = parseFloat(inputs.udhar.value) || 0;
+            const paymentSum = cash + paytm + udhar;
+            const hasValues = inputs.premium.value || inputs.cash.value || inputs.paytm.value || inputs.udhar.value;
+
+            // If there's a mismatch, show the compact error box and stop saving!
+            if (hasValues && premium !== paymentSum) {
+                document.getElementById('errPremiumVal').textContent = premium;
+                document.getElementById('errPaymentSum').textContent = paymentSum;
+                document.getElementById('premiumWarningBox').classList.replace('hidden', 'flex');
+                showToast("Premium mismatch! Please fix.", "error");
+                inputs.premium.focus();
+                return; 
+            }
+
+            const btn = document.getElementById('savePolicyBtn');
+            const btnText = document.getElementById('btnTextPolicy');
+            btnText.textContent = "Saving..."; btn.disabled = true;
+
+            const newRecord = {
+                action: 'savePolicy', sn: currentSN, date: formatDateToDisplay(inputs.date.value),
+                insCompany: inputs.insCompany.value, networkName: inputs.networkName.value,
+                newOld: inputs.newOld.value, invNumber: inputs.invNumber.value,
+                modelName: inputs.modelName.value, customerName: inputs.customerName.value,
+                mobile: inputs.mobile.value, policyNumber: inputs.policyNumber.value,
+                odValue: inputs.odValue.value, premium: inputs.premium.value,
+                frames: inputs.frames.value, regNumber: inputs.regNumber.value,
+                startDate: formatDateToDisplay(inputs.startDate.value), endDate: formatDateToDisplay(inputs.endDate.value),
+                cash: inputs.cash.value, paytm: inputs.paytm.value, udhar: inputs.udhar.value, remark: inputs.remark.value,
+                
+                // Policy is saved blank; it will be assigned a cheque later during Master Cheque Setup
+                chequeNo: "", chequeDate: "", chequeSendDate: "",
+                paidByCheque: "", payout: inputs.payout.value
+            };
+
+            try {
+                await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newRecord) });
+                showToast("Policy Saved!", "success");
+                
+                currentSN++; document.getElementById('nextSnDisplay').textContent = currentSN;
+                
+                // Reset Policy Form
+                ['invNumber', 'modelName', 'customerName', 'mobile', 'policyNumber', 'odValue', 'premium', 'frames', 'cash', 'paytm', 'udhar', 'remark', 'payout'].forEach(id => inputs[id].value = '');
+                handleNewOldToggle(); 
+                hidePremiumError(); // Reset the error box
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+
+                // Fetch updated entries from Sheet after brief delay to allow sheet to process
+                setTimeout(() => fetchTodayEntries(), 1500);
+
+            } catch (e) {
+                showToast("Error saving policy", "error");
+            } finally {
+                btnText.textContent = "Save Policy"; btn.disabled = false;
+            }
+        }
+
+        function fetchTodayEntries() {
+            const todayStr = formatDateToDisplay(inputs.date.value || getTodayString());
+            const tbody = document.getElementById('sessionTableBody');
+            tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-xs text-indigo-500 animate-pulse">Fetching entries from Google Sheet...</td></tr>`;
+
+            fetch(GOOGLE_SCRIPT_URL + '?action=getTodayEntries&date=' + encodeURIComponent(todayStr))
+                .then(res => res.json())
+                .then(result => {
+                    if(result.result === 'success') {
+                        if(!result.data || result.data.length === 0) {
+                            tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-xs text-slate-400">No entries saved yet for this date.</td></tr>`;
+                            return;
+                        }
+                        tbody.innerHTML = '';
+                        result.data.forEach((rec) => {
+                            const tr = document.createElement('tr'); tr.className = "bg-white hover:bg-slate-50 transition-colors";
+                            tr.innerHTML = `
+                                <td class="p-3 border-b text-xs text-center font-mono">${rec.sn}</td>
+                                <td class="p-3 border-b text-xs font-semibold">${rec.customerName}</td>
+                                <td class="p-3 border-b text-xs font-mono">${rec.regNumber || '-'}</td>
+                                <td class="p-3 border-b text-xs font-bold text-indigo-700">₹${rec.premium || 0}</td>
+                                <td class="p-3 border-b text-xs ${rec.chequeNo ? 'text-slate-600' : 'text-amber-500 font-medium'}">${rec.chequeNo ? 'Cheque: ' + rec.chequeNo : 'Pending Link'}</td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
+                    } else {
+                        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-xs text-rose-500">Failed to load entries.</td></tr>`;
+                    }
+                }).catch(err => {
+                    tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-xs text-rose-500">Network error while fetching data.</td></tr>`;
+                });
+        }
+
+        // --- FETCH CHEQUE LOGIC ---
+        function fetchPendingSummary() {
+            const icon = document.getElementById('refreshIcon'); if(icon) icon.classList.add('animate-spin');
+            fetch(GOOGLE_SCRIPT_URL + '?action=getPendingSummary')
+                .then(res => res.json())
+                .then(result => {
+                    if(icon) icon.classList.remove('animate-spin');
+                    const tbody = document.getElementById('pendingSummaryBody');
+                    if(result.result !== 'success' || !result.data.length) {
+                        tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-sm text-slate-500">No pending cheques found in Cheques_Master sheet.</td></tr>`;
+                        return;
+                    }
+                    tbody.innerHTML = '';
+                    result.data.forEach(item => {
+                        const tr = document.createElement('tr'); tr.className = "hover:bg-amber-50/50 bg-white";
+                        tr.innerHTML = `
+                            <td class="p-4 border-b text-sm text-slate-600">${formatDateToDisplay(item.date)}</td>
+                            <td class="p-4 border-b text-sm font-bold">${item.company}</td>
+                            <td class="p-4 border-b text-sm"><button onclick="fetchChequeDetails('${item.chequeNo}')" class="text-indigo-600 font-bold underline hover:text-indigo-800 transition-colors">${item.chequeNo}</button></td>
+                            <td class="p-4 border-b text-sm text-center"><span class="bg-indigo-100 text-indigo-800 font-bold px-2 py-1 rounded-md text-xs">${item.count}</span></td>
+                            <td class="p-4 border-b text-sm font-bold text-right">₹${item.amount}</td>
+                            <td class="p-4 border-b text-sm text-center">
+                                <button onclick="prepareUpdateCheque('${item.chequeNo}', '${item.date}', '${item.amount}')" class="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded text-xs font-bold hover:bg-emerald-200 transition-colors">Add Send Date</button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }).catch(err => { if(icon) icon.classList.remove('animate-spin'); });
+        }
+
+        function fetchChequeDetails(chequeNo) {
+            document.getElementById('pendingSummaryView').classList.add('hidden');
+            document.getElementById('pendingDrillDownView').classList.remove('hidden');
+            document.getElementById('drillDownChequeNo').textContent = chequeNo;
+            const tbody = document.getElementById('drillDownBody');
+            tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-sm text-indigo-500 animate-pulse">Fetching...</td></tr>`;
+
+            fetch(GOOGLE_SCRIPT_URL + '?action=getChequeDetails&chequeNo=' + encodeURIComponent(chequeNo))
+                .then(res => res.json())
+                .then(result => {
+                    tbody.innerHTML = (!result.data || result.data.length === 0) ? `<tr><td colspan="5" class="p-8 text-center">No policies found.</td></tr>` : '';
+                    result.data.forEach(rec => {
+                        const tr = document.createElement('tr'); tr.className = "bg-white hover:bg-slate-50";
+                        tr.innerHTML = `<td class="p-3 border-b text-center font-mono">${rec.sn}</td><td class="p-3 border-b font-semibold">${rec.customerName}</td><td class="p-3 border-b font-mono text-xs">${rec.regNumber}</td><td class="p-3 border-b font-bold">₹${rec.premium}</td><td class="p-3 border-b">${formatDateToDisplay(rec.startDate)}</td>`;
+                        tbody.appendChild(tr);
+                    });
+                });
+        }
+
+        function backToSummary() {
+            document.getElementById('pendingDrillDownView').classList.add('hidden');
+            document.getElementById('pendingSummaryView').classList.remove('hidden');
+        }
+
+        // --- UDHAR TRACKER LOGIC ---
+        function fetchPendingUdhar() {
+            const icon = document.getElementById('refreshUdharIcon'); if(icon) icon.classList.add('animate-spin');
+            
+            fetch(GOOGLE_SCRIPT_URL + '?action=getPendingUdhar')
+                .then(res => res.json())
+                .then(result => {
+                    if(icon) icon.classList.remove('animate-spin');
+                    const tbody = document.getElementById('pendingUdharBody');
+                    if(result.result !== 'success' || !result.data.length) {
+                        tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-sm text-slate-500">No pending Udhar found! All clear.</td></tr>`;
+                        return;
+                    }
+                    tbody.innerHTML = '';
+                    result.data.forEach(item => {
+                        const tr = document.createElement('tr'); tr.className = "hover:bg-rose-50/30 bg-white";
+                        tr.innerHTML = `
+                            <td class="p-4 border-b text-sm text-center font-mono">${item.sn}</td>
+                            <td class="p-4 border-b text-sm text-slate-600">${item.date}</td>
+                            <td class="p-4 border-b text-sm font-bold text-slate-800">${item.customerName}</td>
+                            <td class="p-4 border-b text-sm font-mono text-slate-600">${item.mobile}</td>
+                            <td class="p-4 border-b text-sm text-slate-600">₹${item.premium}</td>
+                            <td class="p-4 border-b text-sm font-bold text-rose-600 text-right">₹${item.udharAmount}</td>
+                            <td class="p-4 border-b text-sm text-center">
+                                <button onclick="openUdharModal('${item.sn}', '${item.customerName}', '${item.udharAmount}')" class="bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded text-xs font-bold hover:bg-indigo-200 transition-colors shadow-sm">Clear Payment</button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }).catch(err => { if(icon) icon.classList.remove('animate-spin'); });
+        }
+
+        function openUdharModal(sn, name, amount) {
+            activeUdharClear = { sn, name, amount };
+            document.getElementById('modUdharSn').textContent = sn;
+            document.getElementById('modUdharName').textContent = name;
+            document.getElementById('modUdharAmount').textContent = amount;
+            document.getElementById('modPaymentMode').value = "Cash"; // Default
+            
+            const modal = document.getElementById('udharModal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+        }
+
+        function closeUdharModal() {
+            const modal = document.getElementById('udharModal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        async function submitUdharClear() {
+            const mode = document.getElementById('modPaymentMode').value;
+            const btn = document.getElementById('btnConfirmUdhar');
+            const btnText = document.getElementById('btnTextUdhar');
+            
+            btnText.textContent = "Processing..."; btn.disabled = true;
+
+            const payload = {
+                action: 'clearUdhar',
+                sn: activeUdharClear.sn,
+                customerName: activeUdharClear.name,
+                paymentMode: mode
+            };
+
+            try {
+                await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                showToast("Udhar Payment Cleared & Logged!", "success");
+                closeUdharModal();
+                setTimeout(() => fetchPendingUdhar(), 1000); // refresh list
+            } catch(e) {
+                showToast("Failed to clear Udhar", "error");
+            } finally {
+                btnText.textContent = "Confirm Payment"; btn.disabled = false;
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast-animate flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-white ${type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'}`;
+            toast.innerHTML = `<span class="font-medium text-sm">${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateY(-100%)'; setTimeout(() => toast.remove(), 300); }, 3000);
+        }
+
+        window.onload = initializeApp;
+    </script>
+</body>
+</html>
